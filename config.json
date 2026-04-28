@@ -1,0 +1,33 @@
+{
+  "_comment": "sysdash config. Edit and restart the server.",
+  "port": 55067,
+  "watched_repos": [
+    "~/code",
+    "~/projects",
+    "~/dev"
+  ],
+  "log_files": [
+    "~/Library/Logs/system.log"
+  ],
+  "alert_thresholds": {
+    "cpu_pct": 90,
+    "ram_pct": 85,
+    "disk_free_pct": 10,
+    "memory_pressure_red": true
+  },
+  "dev_server_health_checks": {
+    "_comment": "Map ports to URL paths. The dashboard will GET http://localhost:PORT+path and color it by status.",
+    "default_path": "/"
+  },
+  "feature_flags": {
+    "show_thermals": true,
+    "show_battery": true,
+    "show_outdated_packages": true,
+    "show_auth_status": true,
+    "show_disk_hogs": true
+  },
+  "outdated_check_interval_sec": 600,
+  "package_inventory_interval_sec": 900,
+  "disk_hog_check_interval_sec": 300,
+  "auth_check_interval_sec": 120
+}

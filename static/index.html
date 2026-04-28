@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>sysdash</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111318'/%3E%3Ccircle cx='10' cy='16' r='3' fill='%2332d74b'/%3E%3Cpath d='M16 10h8v4h-8zm0 8h8v4h-8z' fill='%2364d2ff'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+
+<div id="app-window">
+<div id="header">
+  <div class="title-wrap">
+    <div class="title"><img class="brand-logo" src="/static/graphlogo.png" alt="" /><span class="brand-word">sysdash</span></div>
+  </div>
+  <div class="top-clock" id="top-clock">
+    <div class="clock-time" id="clock-time">--:--</div>
+    <div class="clock-subline" id="clock-date">waiting for data</div>
+    <div class="clock-details" id="clock-details">system details pending</div>
+  </div>
+  <div id="actions">
+    <div class="header-health">
+      <span id="top-health-dot"></span><span id="top-health-text">local system command center</span>
+    </div>
+    <button class="diag" id="learning-mode" title="Show beginner-friendly explanations">🎓 learn</button>
+    <div class="theme-switch" aria-label="Theme">
+      <button class="theme-btn active" data-theme-choice="auto">🖥 Auto</button>
+      <button class="theme-btn" data-theme-choice="light">☀️ Light</button>
+      <button class="theme-btn" data-theme-choice="dark">🌙 Dark</button>
+    </div>
+    <button class="diag" id="open-settings" title="Open dashboard settings">⚙️ settings</button>
+    <button class="diag" id="run-diag" title="Run a one-shot diagnostic">🩺 help me</button>
+  </div>
+</div>
+
+<div id="command-center">
+  <div class="cc-item" data-cc="cpu"><span class="cc-icon">🧠</span><span class="cc-copy"><span class="cc-label">Processor</span><span class="cc-value" id="cc-cpu">--</span></span></div>
+  <div class="cc-item" data-cc="ram"><span class="cc-icon">🧩</span><span class="cc-copy"><span class="cc-label">Memory</span><span class="cc-value" id="cc-ram">--</span></span></div>
+  <div class="cc-item" data-cc="swap"><span class="cc-icon">🔁</span><span class="cc-copy"><span class="cc-label">Swap</span><span class="cc-value" id="cc-swap">--</span></span></div>
+  <div class="cc-item" data-cc="net"><span class="cc-icon">📡</span><span class="cc-copy"><span class="cc-label">Network</span><span class="cc-value" id="cc-net">--</span></span></div>
+  <div class="cc-item" data-cc="ports"><span class="cc-icon">🔌</span><span class="cc-copy"><span class="cc-label">Ports</span><span class="cc-value" id="cc-ports">--</span></span></div>
+  <div class="cc-item" data-cc="updates"><span class="cc-icon">📦</span><span class="cc-copy"><span class="cc-label">Updates</span><span class="cc-value" id="cc-updates">--</span></span></div>
+  <div class="cc-item" data-cc="alerts"><span class="cc-icon">🚨</span><span class="cc-copy"><span class="cc-label">Alerts</span><span class="cc-value" id="cc-alerts">0</span></span></div>
+</div>
+
+<div id="alerts"></div>
+
+<main>
+  <!-- COL 1 -->
+  <div class="col">
+    <div class="card">
+      <h2>CPU
+        <span class="hint" data-tip="The brain of your computer. % is how busy it is. Load average is how many jobs are queued waiting for CPU time. If load > # of cores, things slow down.">?</span>
+      </h2>
+      <div id="cpu-block"></div>
+      <div class="cores" id="cpu-cores"></div>
+      <div class="kv" id="cpu-explain"></div>
+    </div>
+
+    <div class="card">
+      <h2>RAM
+        <span class="hint" data-tip="Memory pressure (green/yellow/red) is the real signal on macOS - high % used is normal because macOS caches aggressively. Watch the pressure light, not the percentage.">?</span>
+      </h2>
+      <div id="ram-block"></div>
+      <div class="kv" id="ram-explain"></div>
+    </div>
+
+    <div class="card">
+      <h2>Top processes by RAM</h2>
+      <table id="top-ram"></table>
+    </div>
+
+    <div class="card">
+      <h2>Top processes by CPU</h2>
+      <table id="top-cpu"></table>
+    </div>
+  </div>
+
+  <!-- COL 2 -->
+  <div class="col">
+    <div class="card diag-card">
+      <h2>Diagnostic <span class="hint" data-tip="Plain-English summary of what's wrong right now. Refreshes with the dashboard.">?</span></h2>
+      <div id="diagnostic"></div>
+    </div>
+
+    <div class="card sysdash-footprint-card">
+      <h2>Sysdash footprint
+        <span class="hint" data-tip="How much CPU and memory this dashboard process is using, including helper child processes.">?</span>
+      </h2>
+      <div id="sysdash-footprint"></div>
+    </div>
+
+    <div class="card">
+      <h2>Listening ports
+        <span class="hint" data-tip="What's running on each port and whether the server is actually responding. The free-port button kills whatever's listening.">?</span>
+      </h2>
+      <table id="ports"></table>
+    </div>
+
+    <div class="card">
+      <h2>Active ports
+        <span class="hint" data-tip="Established TCP connections right now: the local port, remote endpoint, and owning process.">?</span>
+      </h2>
+      <div class="wide-table">
+        <table id="active-ports"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Docker
+        <span class="hint" data-tip="Containers running on your machine. Stop/start with the buttons.">?</span>
+      </h2>
+      <table id="docker"></table>
+    </div>
+
+    <div class="card">
+      <h2>Local services (brew)
+        <span class="hint" data-tip="Background services managed by Homebrew - postgres, redis, nginx, etc. 'started' means running.">?</span>
+      </h2>
+      <table id="services"></table>
+    </div>
+
+    <div class="card">
+      <h2>Disk hogs
+        <span class="hint" data-tip="Common dev-machine bloat. Sizes refresh every few minutes.">?</span>
+      </h2>
+      <table id="disk-hogs"></table>
+    </div>
+
+    <div class="card data-hogs-card">
+      <h2>Data volume files
+        <span class="hint" data-tip="Top 10 largest files under /System/Volumes/Data. This scan is cached because it can be slow.">?</span>
+      </h2>
+      <div class="card-mini-toolbar">
+        <span>/System/Volumes/Data</span>
+        <button id="data-hogs-refresh" class="btn-go" type="button">↻ refresh</button>
+      </div>
+      <table id="data-hogs"></table>
+    </div>
+
+    <div class="card cleanup-card">
+      <h2>Cleanup center
+        <span class="hint" data-tip="Safe cleanup actions for common dev caches. Each action reports what happened and refreshes disk hog data.">?</span>
+      </h2>
+      <button class="cleanup-recommended" id="cleanup-recommended">✨ Recommended cleanup</button>
+      <div id="cleanup-center" class="cleanup-grid"></div>
+    </div>
+
+    <div class="card">
+      <h2>Disk I/O</h2>
+      <div id="disk-block"></div>
+    </div>
+
+    <div class="card">
+      <h2>Network</h2>
+      <div id="net-block"></div>
+    </div>
+  </div>
+
+  <!-- COL 3 -->
+  <div class="col">
+    <div class="card terminal-card">
+      <h2>Terminal
+        <span class="hint" data-tip="Run a sysdash cheat-sheet command inline from your home folder. Use macOS Terminal for anything custom.">?</span>
+      </h2>
+      <form id="terminal-form" class="terminal-form">
+        <input id="terminal-input" list="terminal-commands" autocomplete="off" spellcheck="false" placeholder="df -h" />
+        <datalist id="terminal-commands"></datalist>
+        <button class="btn-go" type="submit">▶️ run</button>
+      </form>
+      <pre id="terminal-output" class="terminal-output">ready</pre>
+    </div>
+
+    <div class="card launcher-card">
+      <h2>Dev Launcher
+        <span class="hint" data-tip="Scan a browser-selected folder for projects, save launch commands, and open them in Terminal. Saved projects live in this browser.">?</span>
+      </h2>
+      <div class="launcher-drop" id="launcher-drop">
+        <div class="drop-icon">🔎</div>
+        <div>
+          <div class="drop-title">📂 Choose a folder</div>
+          <div class="drop-copy">Looks for package.json, app.py, main.py, Makefile, go.mod, Cargo.toml, and shell scripts.</div>
+        </div>
+        <input type="file" id="launcher-folder" webkitdirectory multiple />
+      </div>
+      <label class="launcher-base-label" for="launcher-base">Selected folder path</label>
+      <input class="launcher-base" id="launcher-base" spellcheck="false" placeholder="/Users/kylefleming/projects or ~/Desktop" />
+      <div class="launcher-base-help">Browsers hide absolute folder paths, so set this once to launch from the detected project folder.</div>
+      <div id="launcher-results" class="launcher-list"></div>
+      <div class="launcher-actions">
+        <button class="btn-go" id="launcher-add">➕ manual add</button>
+        <button class="btn-go" id="launcher-clear">🧹 clear</button>
+      </div>
+      <div id="launcher-saved" class="launcher-list"></div>
+    </div>
+
+    <div class="card shortcut-card">
+      <h2>App Shortcuts
+        <span class="hint" data-tip="Save one-click shortcuts for .command files, apps, scripts, workflows, and other safe launcher file types.">?</span>
+      </h2>
+      <div class="launcher-base-help">Add one trusted local shortcut at a time. Supports .command, .app, .workflow, .scpt, .sh, .py, .js, .html, .webloc, .url, and .terminal files.</div>
+      <div class="launcher-actions">
+        <button class="btn-go" id="shortcut-browse">📂 browse + add</button>
+        <button class="btn-go" id="shortcut-add">➕ path add</button>
+        <button class="btn-go" id="shortcut-clear">🧹 clear</button>
+      </div>
+      <div id="shortcut-saved" class="shortcut-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>Internet</h2>
+      <div id="internet"></div>
+    </div>
+
+    <div class="card">
+      <h2>Auth status
+        <span class="hint" data-tip="Are you logged in to gh / aws / gcloud / docker / npm? Saves you the 'permission denied' surprise.">?</span>
+      </h2>
+      <div id="auth"></div>
+    </div>
+
+    <div class="card">
+      <h2>Toolchain
+        <span class="hint" data-tip="Active versions and paths of your dev tools. Useful when 'python' isn't pointing where you think.">?</span>
+      </h2>
+      <table id="toolchain"></table>
+    </div>
+
+    <div class="card">
+      <h2>Dev runtimes</h2>
+      <table id="runtimes"></table>
+    </div>
+
+    <div class="card llm-card">
+      <h2>Local LLMs
+        <span class="hint" data-tip="Monitors common local model servers like Ollama, LM Studio, llama.cpp, KoboldCPP, and matching LLM processes.">?</span>
+      </h2>
+      <div id="llms"></div>
+    </div>
+
+    <div class="card">
+      <h2>Git repos</h2>
+      <table id="git"></table>
+    </div>
+
+    <div class="card">
+      <h2>Outdated packages</h2>
+      <div id="outdated"></div>
+    </div>
+
+    <div class="card">
+      <h2>Installed packages
+        <span class="hint" data-tip="Homebrew, global npm, and pip packages. Green means current; yellow means an update is available; gray means update status could not be checked.">?</span>
+      </h2>
+      <div class="package-controls">
+        <input id="pkg-search" placeholder="Search packages" autocomplete="off" spellcheck="false" />
+        <select id="pkg-manager">
+          <option value="all">all</option>
+          <option value="brew">brew</option>
+          <option value="npm">npm</option>
+          <option value="pip">pip</option>
+        </select>
+        <select id="pkg-status">
+          <option value="all">all</option>
+          <option value="outdated">outdated</option>
+          <option value="current">current</option>
+          <option value="unknown">unknown</option>
+        </select>
+        <button class="btn-go" id="pkg-update-all">⬆️ update filtered</button>
+      </div>
+      <div class="scroll-table package-table">
+        <table id="packages"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>SSH / VPN</h2>
+      <div id="sshvpn"></div>
+    </div>
+
+    <div class="card">
+      <h2>Recent log errors</h2>
+      <div id="logs"></div>
+    </div>
+
+    <div class="card">
+      <h2>Battery / Thermals</h2>
+      <div id="battery"></div>
+    </div>
+
+    <div class="card command-builder-card">
+      <h2>Command Builder
+        <span class="hint" data-tip="Pick what you want to inspect, then run a safe sysdash command.">?</span>
+      </h2>
+      <div class="builder-grid">
+        <label>Goal
+          <select id="builder-goal"></select>
+        </label>
+        <label>Command
+          <select id="builder-command"></select>
+        </label>
+      </div>
+      <div class="builder-preview" id="builder-preview">Choose a goal.</div>
+      <div class="builder-actions">
+        <button class="btn-go" id="builder-inline">💻 run here</button>
+        <button class="btn-go" id="builder-terminal">↗ open Terminal</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Cheatsheet
+        <span class="hint" data-tip="Click any command to run it in Terminal.">?</span>
+      </h2>
+      <div class="cheats" id="cheats"></div>
+    </div>
+  </div>
+</main>
+
+<div id="footer">sysdash &middot; <span id="ws-status">connecting...</span> &middot; last update <span id="ts">-</span></div>
+
+<nav id="dock" aria-label="Quick sections">
+  <button data-scroll-target="diagnostic">🩺 Diagnostic</button>
+  <button data-scroll-target="terminal-output">💻 Terminal</button>
+  <button data-scroll-target="launcher-saved">🚀 Launcher</button>
+  <button data-scroll-target="shortcut-saved">🖱 Shortcuts</button>
+  <button data-scroll-target="llms">🤖 LLMs</button>
+  <button data-scroll-target="ports">🔌 Ports</button>
+  <button data-scroll-target="packages">📦 Packages</button>
+  <button data-scroll-target="builder-preview">🧱 Builder</button>
+  <button data-scroll-target="cheats">⚡ Cheats</button>
+</nav>
+
+<div id="modal-bg">
+  <div id="modal">
+    <h3 id="modal-title">Confirm</h3>
+    <div id="modal-body"></div>
+    <div class="row">
+      <button class="cancel" id="modal-cancel">✕ Cancel</button>
+      <button class="confirm" id="modal-confirm">✓ Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="palette-bg" aria-hidden="true">
+  <div id="palette">
+    <input id="palette-input" autocomplete="off" spellcheck="false" placeholder="Jump to card or run an action..." />
+    <div id="palette-results"></div>
+  </div>
+</div>
+
+<aside id="settings-panel" aria-hidden="true">
+  <div class="settings-shell">
+    <div class="settings-head">
+      <div>
+        <h2>⚙️ Settings</h2>
+        <p>Configure sysdash without editing JSON by hand.</p>
+      </div>
+      <button id="close-settings" class="btn-x">✕ close</button>
+    </div>
+    <div class="settings-grid">
+      <label>Port
+        <input id="set-port" type="number" min="1024" max="65535" />
+      </label>
+      <label>CPU alert %
+        <input id="set-cpu" type="number" min="1" max="100" />
+      </label>
+      <label>RAM alert %
+        <input id="set-ram" type="number" min="1" max="100" />
+      </label>
+      <label>Disk free alert %
+        <input id="set-disk" type="number" min="1" max="99" />
+      </label>
+      <label>Outdated check sec
+        <input id="set-outdated-interval" type="number" min="60" step="30" />
+      </label>
+      <label>Package inventory sec
+        <input id="set-package-interval" type="number" min="120" step="60" />
+      </label>
+    </div>
+    <label class="settings-wide">Watched repo folders
+      <textarea id="set-repos" spellcheck="false" placeholder="~/code&#10;~/projects"></textarea>
+    </label>
+    <label class="settings-wide">Log files
+      <textarea id="set-logs" spellcheck="false" placeholder="~/Library/Logs/system.log"></textarea>
+    </label>
+    <div class="settings-flags">
+      <label><input id="set-red-pressure" type="checkbox" /> Alert on red memory pressure</label>
+      <label><input id="set-battery" type="checkbox" /> Show battery / thermals</label>
+      <label><input id="set-auth" type="checkbox" /> Show auth status</label>
+      <label><input id="set-disk-hogs" type="checkbox" /> Show disk hogs</label>
+    </div>
+    <div class="settings-actions">
+      <button class="btn-go" id="reload-settings">↻ reload</button>
+      <button class="diag" id="save-settings">💾 save settings</button>
+    </div>
+  </div>
+</aside>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

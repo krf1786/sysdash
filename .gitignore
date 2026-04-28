@@ -1,0 +1,17 @@
+.DS_Store
+.venv/
+.playwright-cli/
+__pycache__/
+*.py[cod]
+
+# Runtime logs
+*.log
+*.err
+
+# Local/generated app builds
+MenuBarApp/*.app/
+MenuBarApp/SysdashMenu.app/
+
+# Local OS/editor noise
+.idea/
+.vscode/
