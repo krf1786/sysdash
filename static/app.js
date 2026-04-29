@@ -29,6 +29,8 @@ let lastPackages = [];
 let packageFilters = { search: '', manager: 'all', status: 'all' };
 let activeConfig = null;
 let lastCheats = [];
+let llmChatServers = [];
+let llmChatHistory = [];
 
 // Ask for notification permission once.
 if ('Notification' in window && Notification.permission === 'default') {
@@ -548,6 +550,7 @@ function renderLlms(data) {
   const servers = data.servers || [];
   const processes = data.processes || [];
   const summary = data.summary || {};
+  updateLlmChatOptions(servers);
   const serverHtml = servers.map(s => {
     const cls = s.status === 'api' ? 'ok' : s.status === 'listening' ? 'warn' : 'dim';
     const modelText = s.model_count ? `${s.model_count} model${s.model_count === 1 ? '' : 's'}` : s.status === 'offline' ? 'offline' : 'no model list';
@@ -581,6 +584,107 @@ function renderLlms(data) {
     <div class="llm-server-list">${serverHtml}</div>
     ${procHtml}
   `;
+}
+
+function updateLlmChatOptions(servers) {
+  llmChatServers = servers.filter(s => s.status === 'api');
+  const serverSelect = $('llm-chat-server');
+  const modelSelect = $('llm-chat-model');
+  const status = $('llm-chat-status');
+  if (!serverSelect || !modelSelect) return;
+
+  const currentPort = serverSelect.value;
+  serverSelect.innerHTML = '';
+  if (!llmChatServers.length) {
+    serverSelect.appendChild(el('option', { value: '' }, 'no local LLM online'));
+    modelSelect.innerHTML = '<option value="">no models</option>';
+    if (status) status.textContent = 'offline until a local LLM API is detected';
+    return;
+  }
+
+  llmChatServers.forEach(s => {
+    serverSelect.appendChild(el('option', { value: String(s.port) }, `${s.name} :${s.port}`));
+  });
+  if (currentPort && llmChatServers.some(s => String(s.port) === currentPort)) {
+    serverSelect.value = currentPort;
+  }
+  refreshLlmChatModels();
+  if (status) status.textContent = 'ready';
+}
+
+function refreshLlmChatModels() {
+  const serverSelect = $('llm-chat-server');
+  const modelSelect = $('llm-chat-model');
+  if (!serverSelect || !modelSelect) return;
+  const server = llmChatServers.find(s => String(s.port) === serverSelect.value) || llmChatServers[0];
+  modelSelect.innerHTML = '';
+  const models = server?.models || [];
+  if (!models.length) {
+    modelSelect.appendChild(el('option', { value: '' }, 'default model'));
+    return;
+  }
+  models.forEach(model => modelSelect.appendChild(el('option', { value: model }, model)));
+}
+
+function renderLlmChatLog() {
+  const log = $('llm-chat-log');
+  if (!log) return;
+  if (!llmChatHistory.length) {
+    log.innerHTML = '<div class="llm-chat-empty">Start LM Studio or Ollama, then ask for help right here.</div>';
+    return;
+  }
+  log.innerHTML = llmChatHistory.map(item => `
+    <div class="llm-chat-msg ${item.role}">
+      <div>${item.role === 'user' ? 'you' : 'local llm'}</div>
+      <p>${escapeHtml(item.content)}</p>
+    </div>
+  `).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+function setupLlmChat() {
+  const form = $('llm-chat-form');
+  const input = $('llm-chat-input');
+  const status = $('llm-chat-status');
+  const serverSelect = $('llm-chat-server');
+  if (!form || !input || form.dataset.ready) return;
+  form.dataset.ready = '1';
+  serverSelect?.addEventListener('change', refreshLlmChatModels);
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const message = input.value.trim();
+    if (!message) return;
+    if (!llmChatServers.length) {
+      alert('No local LLM API is online. Start LM Studio or Ollama first.');
+      return;
+    }
+    const btn = form.querySelector('button');
+    input.value = '';
+    llmChatHistory.push({ role: 'user', content: message });
+    renderLlmChatLog();
+    if (status) status.textContent = 'thinking...';
+    if (btn) btn.disabled = true;
+    try {
+      const data = await postJson('/api/llm/chat', {
+        message,
+        history: llmChatHistory.slice(0, -1),
+        port: $('llm-chat-server')?.value || '',
+        model: $('llm-chat-model')?.value || '',
+      });
+      if (!data.ok) throw new Error(data.detail || 'Local LLM request failed');
+      llmChatHistory.push({ role: 'assistant', content: data.reply });
+      renderLlmChatLog();
+      const tps = data.tokens_per_sec == null ? '' : ` · ${Number(data.tokens_per_sec).toFixed(1)} tok/s`;
+      if (status) status.textContent = `${data.server} · ${data.model || 'default'} · ${data.elapsed_sec}s${tps}`;
+    } catch (e) {
+      llmChatHistory.push({ role: 'assistant', content: `Could not reach the local LLM: ${e.message || e}` });
+      renderLlmChatLog();
+      if (status) status.textContent = 'request failed';
+    } finally {
+      if (btn) btn.disabled = false;
+      input.focus();
+    }
+  });
 }
 
 function renderGit(rows) {
@@ -1006,6 +1110,7 @@ const CARD_KIND_MAP = [
   ['disk', 'disk', '💾'],
   ['network', 'network', '📡'],
   ['terminal', 'terminal', '💻'],
+  ['llm assistant', 'llm', '🤖'],
   ['app shortcuts', 'shortcut', '🖱'],
   ['launcher', 'launcher', '🚀'],
   ['internet', 'internet', '🌐'],
@@ -1563,6 +1668,7 @@ setupCommandPalette();
 setupPackageControls();
 setupSettingsPanel();
 setupDataHogsControls();
+setupLlmChat();
 
 $('modal-cancel')?.addEventListener('click', () => {
   $('modal-bg')?.classList.remove('show');

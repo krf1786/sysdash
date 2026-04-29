@@ -239,6 +239,24 @@
       <div id="llms"></div>
     </div>
 
+    <div class="card llm-chat-card">
+      <h2>LLM Assistant
+        <span class="hint" data-tip="Chat with an offline local LLM server. Works with Ollama, LM Studio, llama.cpp, and other OpenAI-compatible local endpoints.">?</span>
+      </h2>
+      <div class="llm-chat-controls">
+        <select id="llm-chat-server"></select>
+        <select id="llm-chat-model"></select>
+      </div>
+      <div id="llm-chat-log" class="llm-chat-log">
+        <div class="llm-chat-empty">Start LM Studio or Ollama, then ask for help right here.</div>
+      </div>
+      <form id="llm-chat-form" class="llm-chat-form">
+        <textarea id="llm-chat-input" rows="3" spellcheck="true" placeholder="Ask your local model for help..."></textarea>
+        <button class="btn-go" type="submit">send</button>
+      </form>
+      <div id="llm-chat-status" class="llm-chat-status">offline until a local LLM API is detected</div>
+    </div>
+
     <div class="card">
       <h2>Git repos</h2>
       <table id="git"></table>

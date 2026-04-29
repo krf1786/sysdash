@@ -11,6 +11,8 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -387,6 +389,120 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
 
+def _post_json_url(url: str, payload: dict[str, Any], timeout: float = 60.0) -> tuple[int, Any, float]:
+    started = time.time()
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        raw = response.read(1_000_000).decode("utf-8", errors="replace")
+        data = json.loads(raw) if raw else {}
+        return response.status, data, max(time.time() - started, 0.001)
+
+
+def _local_llm_chat(payload: dict[str, Any]) -> dict[str, Any]:
+    message = str(payload.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Missing message")
+    if len(message) > 4000:
+        raise HTTPException(status_code=400, detail="Message is too long")
+
+    requested_port = int(payload["port"]) if payload.get("port") else None
+    requested_model = str(payload.get("model") or "").strip()
+    history = payload.get("history") if isinstance(payload.get("history"), list) else []
+    clean_history = []
+    for item in history[-10:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = str(item.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            clean_history.append({"role": role, "content": content[:4000]})
+
+    llms = cdev.local_llms()
+    servers = [s for s in llms.get("servers", []) if s.get("status") == "api"]
+    if requested_port:
+        servers = [s for s in servers if int(s.get("port") or 0) == requested_port]
+    if not servers:
+        raise HTTPException(status_code=503, detail="No local LLM API is online. Start LM Studio or Ollama, then refresh sysdash.")
+
+    server = servers[0]
+    spec = next((s for s in cdev.LLM_SERVERS if int(s["port"]) == int(server["port"])), None)
+    if not spec:
+        raise HTTPException(status_code=503, detail="That local LLM server is not supported yet")
+
+    model = requested_model or (server.get("models") or [""])[0]
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a concise local coding assistant inside sysdash. Help with shell, Python, JavaScript, local debugging, and explain risks before destructive actions.",
+        },
+        *clean_history,
+        {"role": "user", "content": message},
+    ]
+
+    try:
+        if spec["kind"] == "ollama":
+            if not model:
+                raise HTTPException(status_code=400, detail="Ollama has no loaded model listed")
+            _status, data, elapsed = _post_json_url(
+                f"http://127.0.0.1:{server['port']}/api/chat",
+                {
+                    "model": model,
+                    "messages": messages,
+                    "stream": False,
+                    "keep_alive": "10m",
+                    "options": {"temperature": 0.35, "num_predict": 512},
+                },
+                timeout=90,
+            )
+            reply = ((data.get("message") or {}).get("content") or "").strip()
+            tokens = data.get("eval_count")
+        elif spec["kind"] == "openai":
+            if not model:
+                raise HTTPException(status_code=400, detail="No model is available from that server")
+            _status, data, elapsed = _post_json_url(
+                f"http://127.0.0.1:{server['port']}/v1/chat/completions",
+                {
+                    "model": model,
+                    "messages": messages,
+                    "max_tokens": 512,
+                    "temperature": 0.35,
+                    "stream": False,
+                },
+                timeout=90,
+            )
+            choices = data.get("choices") or []
+            reply = (((choices[0] or {}).get("message") or {}).get("content") or "").strip() if choices else ""
+            tokens = (data.get("usage") or {}).get("completion_tokens")
+        else:
+            raise HTTPException(status_code=400, detail=f"{server['name']} chat is not supported yet")
+    except HTTPException:
+        raise
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise HTTPException(status_code=503, detail=f"Local LLM request failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if not reply:
+        raise HTTPException(status_code=502, detail="The local LLM returned an empty response")
+
+    return {
+        "ok": True,
+        "reply": reply,
+        "server": server["name"],
+        "port": server["port"],
+        "model": model,
+        "elapsed_sec": round(elapsed, 2),
+        "tokens": tokens,
+        "tokens_per_sec": round(float(tokens) / elapsed, 2) if tokens else None,
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
     return HTMLResponse((HERE / "static" / "index.html").read_text())
@@ -467,6 +583,11 @@ async def delete_data_hog(payload: dict[str, Any]) -> dict[str, Any]:
         "trash_path": str(dest),
         "data_hogs": STATE.cached_data_hogs,
     }
+
+
+@app.post("/api/llm/chat")
+async def llm_chat(payload: dict[str, Any]) -> dict[str, Any]:
+    return await asyncio.to_thread(_local_llm_chat, payload)
 
 
 @app.websocket("/ws")

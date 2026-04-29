@@ -840,6 +840,91 @@ tr.needs-update td { background: rgba(241, 196, 15, 0.035); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.llm-chat-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.llm-chat-controls select,
+.llm-chat-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+  font-family: var(--font);
+  font-size: 11px;
+  outline: none;
+}
+.llm-chat-controls select {
+  height: 32px;
+  padding: 0 9px;
+}
+.llm-chat-log {
+  min-height: 170px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--violet) 22%, var(--border));
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--violet) 16%, transparent), transparent 11rem),
+    rgba(0,0,0,0.18);
+}
+.llm-chat-empty {
+  color: var(--text-dim);
+  font-style: italic;
+}
+.llm-chat-msg {
+  display: grid;
+  gap: 3px;
+}
+.llm-chat-msg > div {
+  color: var(--text-dim);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.llm-chat-msg p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.045);
+}
+.llm-chat-msg.user p {
+  border-color: color-mix(in srgb, var(--blue) 36%, var(--border));
+  background: color-mix(in srgb, var(--blue) 12%, rgba(255,255,255,0.035));
+}
+.llm-chat-msg.assistant p {
+  border-color: color-mix(in srgb, var(--violet) 36%, var(--border));
+  background: color-mix(in srgb, var(--violet) 12%, rgba(255,255,255,0.035));
+}
+.llm-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  margin-top: 8px;
+}
+.llm-chat-form textarea {
+  min-height: 70px;
+  resize: vertical;
+  padding: 9px 10px;
+}
+.llm-chat-status {
+  margin-top: 7px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
 .llm-processes th:nth-child(1),
 .llm-processes td:nth-child(1) { width: 42px; }
 .llm-processes th:nth-child(3),
