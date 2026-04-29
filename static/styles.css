@@ -2783,15 +2783,14 @@ main {
   box-shadow: none;
 }
 .card::before {
-  width: 2px;
-  opacity: 0.85;
+  display: none;
 }
 .card::after {
   opacity: 0.18;
 }
 .card:hover {
   transform: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-accent, var(--cyan)) 32%, transparent);
+  box-shadow: none;
 }
 .card h2 {
   min-height: 20px;
