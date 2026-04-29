@@ -39,8 +39,8 @@ def cpu_ram() -> dict[str, Any]:
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
-    top_ram = sorted(procs, key=lambda x: x["rss_mb"], reverse=True)[:10]
-    top_cpu = sorted(procs, key=lambda x: x["cpu_pct"], reverse=True)[:10]
+    top_ram = sorted(procs, key=lambda x: x["rss_mb"], reverse=True)[:5]
+    top_cpu = sorted(procs, key=lambda x: x["cpu_pct"], reverse=True)[:5]
 
     return {
         "cpu": {

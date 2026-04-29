@@ -590,6 +590,11 @@ async def llm_chat(payload: dict[str, Any]) -> dict[str, Any]:
     return await asyncio.to_thread(_local_llm_chat, payload)
 
 
+@app.post("/api/llm/reset")
+async def llm_reset() -> dict[str, Any]:
+    return cdev.reset_local_llm_state()
+
+
 @app.websocket("/ws")
 async def ws(ws: WebSocket) -> None:
     await ws.accept()

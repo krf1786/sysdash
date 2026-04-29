@@ -23,6 +23,7 @@
     <div class="header-health">
       <span id="top-health-dot"></span><span id="top-health-text">local system command center</span>
     </div>
+    <div class="header-battery" id="header-battery">🔋 --</div>
     <button class="diag" id="learning-mode" title="Show beginner-friendly explanations">🎓 learn</button>
     <div class="theme-switch" aria-label="Theme">
       <button class="theme-btn active" data-theme-choice="auto">🖥 Auto</button>
@@ -35,13 +36,13 @@
 </div>
 
 <div id="command-center">
-  <div class="cc-item" data-cc="cpu"><span class="cc-icon">🧠</span><span class="cc-copy"><span class="cc-label">Processor</span><span class="cc-value" id="cc-cpu">--</span></span></div>
-  <div class="cc-item" data-cc="ram"><span class="cc-icon">🧩</span><span class="cc-copy"><span class="cc-label">Memory</span><span class="cc-value" id="cc-ram">--</span></span></div>
-  <div class="cc-item" data-cc="swap"><span class="cc-icon">🔁</span><span class="cc-copy"><span class="cc-label">Swap</span><span class="cc-value" id="cc-swap">--</span></span></div>
-  <div class="cc-item" data-cc="net"><span class="cc-icon">📡</span><span class="cc-copy"><span class="cc-label">Network</span><span class="cc-value" id="cc-net">--</span></span></div>
-  <div class="cc-item" data-cc="ports"><span class="cc-icon">🔌</span><span class="cc-copy"><span class="cc-label">Ports</span><span class="cc-value" id="cc-ports">--</span></span></div>
-  <div class="cc-item" data-cc="updates"><span class="cc-icon">📦</span><span class="cc-copy"><span class="cc-label">Updates</span><span class="cc-value" id="cc-updates">--</span></span></div>
-  <div class="cc-item" data-cc="alerts"><span class="cc-icon">🚨</span><span class="cc-copy"><span class="cc-label">Alerts</span><span class="cc-value" id="cc-alerts">0</span></span></div>
+  <div class="cc-item" data-cc="cpu"><span class="cc-icon">🧠</span><span class="cc-copy"><span class="cc-label">Processor</span><span class="cc-value" id="cc-cpu">--</span><span class="cc-meter"><i id="cc-cpu-meter"></i></span></span></div>
+  <div class="cc-item" data-cc="ram"><span class="cc-icon">🧩</span><span class="cc-copy"><span class="cc-label">Memory</span><span class="cc-value" id="cc-ram">--</span><span class="cc-meter"><i id="cc-ram-meter"></i></span></span></div>
+  <div class="cc-item" data-cc="swap"><span class="cc-icon">🔁</span><span class="cc-copy"><span class="cc-label">Swap</span><span class="cc-value" id="cc-swap">--</span><span class="cc-meter"><i id="cc-swap-meter"></i></span></span></div>
+  <div class="cc-item" data-cc="net"><span class="cc-icon">📡</span><span class="cc-copy"><span class="cc-label">Network</span><span class="cc-value" id="cc-net">--</span><span class="cc-meter"><i id="cc-net-meter"></i></span></span></div>
+  <div class="cc-item" data-cc="ports"><span class="cc-icon">🔌</span><span class="cc-copy"><span class="cc-label">Ports</span><span class="cc-value" id="cc-ports">--</span><span class="cc-meter"><i id="cc-ports-meter"></i></span></span></div>
+  <div class="cc-item" data-cc="updates"><span class="cc-icon">📦</span><span class="cc-copy"><span class="cc-label">Updates</span><span class="cc-value" id="cc-updates">--</span><span class="cc-meter"><i id="cc-updates-meter"></i></span></span></div>
+  <div class="cc-item" data-cc="alerts"><span class="cc-icon">🚨</span><span class="cc-copy"><span class="cc-label">Alerts</span><span class="cc-value" id="cc-alerts">0</span><span class="cc-meter"><i id="cc-alerts-meter"></i></span></span></div>
 </div>
 
 <div id="alerts"></div>
@@ -107,18 +108,11 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Docker
-        <span class="hint" data-tip="Containers running on your machine. Stop/start with the buttons.">?</span>
+    <div class="card status-card">
+      <h2>Status
+        <span class="hint" data-tip="Internet, auth, brew services, Docker summary, and SSH/VPN in one compact place.">?</span>
       </h2>
-      <table id="docker"></table>
-    </div>
-
-    <div class="card">
-      <h2>Local services (brew)
-        <span class="hint" data-tip="Background services managed by Homebrew - postgres, redis, nginx, etc. 'started' means running.">?</span>
-      </h2>
-      <table id="services"></table>
+      <div id="status-panel"></div>
     </div>
 
     <div class="card">
@@ -130,7 +124,7 @@
 
     <div class="card data-hogs-card">
       <h2>Data volume files
-        <span class="hint" data-tip="Top 10 largest files under /System/Volumes/Data. This scan is cached because it can be slow.">?</span>
+        <span class="hint" data-tip="Top 5 largest files under /System/Volumes/Data. This scan is cached because it can be slow.">?</span>
       </h2>
       <div class="card-mini-toolbar">
         <span>/System/Volumes/Data</span>
@@ -161,9 +155,22 @@
   <!-- COL 3 -->
   <div class="col">
     <div class="card terminal-card">
-      <h2>Terminal
-        <span class="hint" data-tip="Run a sysdash cheat-sheet command inline from your home folder. Use macOS Terminal for anything custom.">?</span>
+      <h2>Terminal + Command Builder
+        <span class="hint" data-tip="Pick a safe sysdash command or type one from the dropdown, then run inline or open it in Terminal.">?</span>
       </h2>
+      <div class="builder-grid terminal-builder">
+        <label>Goal
+          <select id="builder-goal"></select>
+        </label>
+        <label>Command
+          <select id="builder-command"></select>
+        </label>
+      </div>
+      <div class="builder-preview" id="builder-preview">Choose a goal.</div>
+      <div class="builder-actions">
+        <button class="btn-go" id="builder-inline">💻 run here</button>
+        <button class="btn-go" id="builder-terminal">↗ open Terminal</button>
+      </div>
       <form id="terminal-form" class="terminal-form">
         <input id="terminal-input" list="terminal-commands" autocomplete="off" spellcheck="false" placeholder="df -h" />
         <datalist id="terminal-commands"></datalist>
@@ -209,18 +216,6 @@
     </div>
 
     <div class="card">
-      <h2>Internet</h2>
-      <div id="internet"></div>
-    </div>
-
-    <div class="card">
-      <h2>Auth status
-        <span class="hint" data-tip="Are you logged in to gh / aws / gcloud / docker / npm? Saves you the 'permission denied' surprise.">?</span>
-      </h2>
-      <div id="auth"></div>
-    </div>
-
-    <div class="card">
       <h2>Toolchain
         <span class="hint" data-tip="Active versions and paths of your dev tools. Useful when 'python' isn't pointing where you think.">?</span>
       </h2>
@@ -236,6 +231,10 @@
       <h2>Local LLMs
         <span class="hint" data-tip="Monitors common local model servers like Ollama, LM Studio, llama.cpp, KoboldCPP, and matching LLM processes.">?</span>
       </h2>
+      <div class="card-mini-toolbar">
+        <span>offline model monitor</span>
+        <button id="llm-reset" class="btn-go" type="button">reset</button>
+      </div>
       <div id="llms"></div>
     </div>
 
@@ -258,19 +257,17 @@
     </div>
 
     <div class="card">
-      <h2>Git repos</h2>
+      <h2>Local git repos
+        <span class="hint" data-tip="Local folders from config.json watched_repos, not GitHub watch subscriptions. Add project folders there if you want repo status here.">?</span>
+      </h2>
       <table id="git"></table>
-    </div>
-
-    <div class="card">
-      <h2>Outdated packages</h2>
-      <div id="outdated"></div>
     </div>
 
     <div class="card">
       <h2>Installed packages
         <span class="hint" data-tip="Homebrew, global npm, and pip packages. Green means current; yellow means an update is available; gray means update status could not be checked.">?</span>
       </h2>
+      <div id="package-summary" class="package-summary"></div>
       <div class="package-controls">
         <input id="pkg-search" placeholder="Search packages" autocomplete="off" spellcheck="false" />
         <select id="pkg-manager">
@@ -293,44 +290,8 @@
     </div>
 
     <div class="card">
-      <h2>SSH / VPN</h2>
-      <div id="sshvpn"></div>
-    </div>
-
-    <div class="card">
       <h2>Recent log errors</h2>
       <div id="logs"></div>
-    </div>
-
-    <div class="card">
-      <h2>Battery / Thermals</h2>
-      <div id="battery"></div>
-    </div>
-
-    <div class="card command-builder-card">
-      <h2>Command Builder
-        <span class="hint" data-tip="Pick what you want to inspect, then run a safe sysdash command.">?</span>
-      </h2>
-      <div class="builder-grid">
-        <label>Goal
-          <select id="builder-goal"></select>
-        </label>
-        <label>Command
-          <select id="builder-command"></select>
-        </label>
-      </div>
-      <div class="builder-preview" id="builder-preview">Choose a goal.</div>
-      <div class="builder-actions">
-        <button class="btn-go" id="builder-inline">💻 run here</button>
-        <button class="btn-go" id="builder-terminal">↗ open Terminal</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Cheatsheet
-        <span class="hint" data-tip="Click any command to run it in Terminal.">?</span>
-      </h2>
-      <div class="cheats" id="cheats"></div>
     </div>
   </div>
 </main>
@@ -346,7 +307,6 @@
   <button data-scroll-target="ports">🔌 Ports</button>
   <button data-scroll-target="packages">📦 Packages</button>
   <button data-scroll-target="builder-preview">🧱 Builder</button>
-  <button data-scroll-target="cheats">⚡ Cheats</button>
 </nav>
 
 <div id="modal-bg">

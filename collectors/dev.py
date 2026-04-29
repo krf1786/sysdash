@@ -254,6 +254,13 @@ _LLM_TPS_STATE: dict[int, tuple[float, float]] = {}
 _LLM_SAMPLE_STATE: dict[int, dict[str, Any]] = {}
 
 
+def reset_local_llm_state() -> dict[str, Any]:
+    """Clear cached local LLM sampling state."""
+    _LLM_TPS_STATE.clear()
+    _LLM_SAMPLE_STATE.clear()
+    return {"ok": True, "detail": "Local LLM token-rate caches reset."}
+
+
 def _http_json(url: str, timeout: float = 1.4) -> tuple[bool, Any]:
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})

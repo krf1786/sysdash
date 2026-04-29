@@ -93,6 +93,12 @@ function setCc(id, value, klass = '') {
   node.className = `cc-value ${klass}`.trim();
 }
 
+function setCcMeter(id, pct) {
+  const node = $(id);
+  if (!node) return;
+  node.style.width = `${Math.max(0, Math.min(100, Number(pct) || 0))}%`;
+}
+
 function linesFromTextarea(id) {
   return ($(id)?.value || '').split('\n').map(x => x.trim()).filter(Boolean);
 }
@@ -164,17 +170,12 @@ function render(m) {
   renderSysdashFootprint(m.self);
   renderPorts(m.ports || [], m.port_health || []);
   renderActivePorts(m.active_ports || []);
-  renderDocker(m.docker || []);
-  renderServices(m.services || []);
+  renderStatusPanel(m);
   renderRuntimes(m.runtimes?.processes || []);
   renderLlms(m.llms || {});
   renderGit(m.git || []);
   renderToolchain(m.toolchain || []);
-  renderInternet(m.internet || {});
-  renderAuth(m.auth || []);
-  renderOutdated(m.outdated || {});
   renderPackages(m.packages || []);
-  renderSshVpn(m.ssh_vpn || {});
   renderLogs(m.log_errors || []);
   renderBattery(m.battery_thermals || {});
   renderCheats(m.cheatsheet || []);
@@ -277,6 +278,13 @@ function renderCommandCenter(m) {
   setCc('cc-ports', `${ports.length}`, ports.length > 15 ? 'warn' : 'ok');
   setCc('cc-updates', outdated ? `${outdated}` : '0', outdated ? 'warn' : 'ok');
   setCc('cc-alerts', alerts.length ? `${alerts.length}` : '0', alerts.some(a => a.level === 'red') ? 'bad' : alerts.length ? 'warn' : 'ok');
+  setCcMeter('cc-cpu-meter', cpu);
+  setCcMeter('cc-ram-meter', ram);
+  setCcMeter('cc-swap-meter', swap);
+  setCcMeter('cc-net-meter', Math.min(100, ((Number(net.down_kbps || 0) + Number(net.up_kbps || 0)) / 500) * 100));
+  setCcMeter('cc-ports-meter', Math.min(100, (ports.length / 25) * 100));
+  setCcMeter('cc-updates-meter', Math.min(100, (outdated / 25) * 100));
+  setCcMeter('cc-alerts-meter', Math.min(100, (alerts.length / 5) * 100));
 }
 
 function renderTopHealth(m) {
@@ -408,11 +416,8 @@ function renderDisk(d) {
 function renderNet(n) {
   if (!n) return;
   $('net-block').innerHTML =
-    row('down', `${n.down_kbps} KB/s`) +
-    row('up', `${n.up_kbps} KB/s`) +
-    row('total recv', `${n.total_recv_mb} MB`) +
-    row('total sent', `${n.total_sent_mb} MB`) +
     row('connections', n.active_connections) +
+    row('traffic', `↓ ${n.down_kbps} KB/s · ↑ ${n.up_kbps} KB/s`) +
     trend('Network trend', pushTrend('net', (n.down_kbps || 0) + (n.up_kbps || 0)));
 }
 
@@ -432,13 +437,7 @@ function renderSysdashFootprint(s) {
   const memClass = Number(s.rss_mb || 0) > 900 ? 'bad' : Number(s.rss_mb || 0) > 500 ? 'warn' : '';
   div.innerHTML =
     row('cpu', `${Number(s.cpu_pct || 0).toFixed(1)}%`, cpuClass) +
-    row('memory', `${Number(s.rss_mb || 0).toFixed(1)} MB`, memClass) +
-    row('pid', `${s.pid || '-'}`) +
-    row('threads', `${s.threads || 0}`) +
-    row('helpers', `${s.children || 0}`) +
-    row('uptime', formatUptime(s.uptime_sec)) +
-    row('local port', `${s.port || '-'}`) +
-    trend('sysdash trend', pushTrend('sysdash', Number(s.rss_mb || 0)));
+    row('memory', `${Number(s.rss_mb || 0).toFixed(1)} MB`, memClass);
 }
 
 function renderPorts(ports, healths) {
@@ -523,6 +522,38 @@ function renderServices(rows) {
     body.appendChild(tr);
   });
   tbl.appendChild(head); tbl.appendChild(body);
+}
+
+function renderStatusPanel(m) {
+  const div = $('status-panel');
+  if (!div) return;
+  const inet = m.internet || {};
+  const auth = m.auth || [];
+  const services = m.services || [];
+  const sshvpn = m.ssh_vpn || {};
+  const docker = m.docker || [];
+  const online = Object.values(inet).filter(Boolean).length;
+  const inetTotal = Object.keys(inet).length;
+  const authOk = auth.filter(x => x.installed && x.ok).length;
+  const authInstalled = auth.filter(x => x.installed).length;
+  const serviceStarted = services.filter(x => x.status === 'started').length;
+  const dockerRunning = docker.filter(x => x.running).length;
+  const sshCount = sshvpn.ssh?.length || 0;
+  const vpnCount = sshvpn.vpn?.length || 0;
+  const authRows = auth.slice(0, 5).map(a => `
+    <span class="status-pill"><span class="dot ${!a.installed ? 'dim' : a.ok ? 'ok' : 'bad'}"></span>${escapeHtml(a.name)}</span>
+  `).join('');
+  div.innerHTML = `
+    <div class="status-grid">
+      <div><strong>${online}/${inetTotal || 0}</strong><span>internet checks</span></div>
+      <div><strong>${authOk}/${authInstalled || 0}</strong><span>auth logins</span></div>
+      <div><strong>${serviceStarted}</strong><span>brew services</span></div>
+      <div><strong>${dockerRunning}/${docker.length}</strong><span>docker running</span></div>
+      <div><strong>${sshCount}</strong><span>ssh sessions</span></div>
+      <div><strong>${vpnCount}</strong><span>vpn interfaces</span></div>
+    </div>
+    <div class="status-pills">${authRows || '<span class="no-data">auth checking...</span>'}</div>
+  `;
 }
 
 function renderRuntimes(rows) {
@@ -647,9 +678,17 @@ function setupLlmChat() {
   const input = $('llm-chat-input');
   const status = $('llm-chat-status');
   const serverSelect = $('llm-chat-server');
+  const reset = $('llm-reset');
   if (!form || !input || form.dataset.ready) return;
   form.dataset.ready = '1';
   serverSelect?.addEventListener('change', refreshLlmChatModels);
+  reset?.addEventListener('click', async () => {
+    llmChatHistory = [];
+    renderLlmChatLog();
+    if (status) status.textContent = 'resetting local LLM state...';
+    const r = await postAction('/api/llm/reset');
+    if (status) status.textContent = r.detail || 'local LLM state reset';
+  });
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const message = input.value.trim();
@@ -689,7 +728,7 @@ function setupLlmChat() {
 
 function renderGit(rows) {
   const tbl = $('git'); tbl.innerHTML = '';
-  if (!rows.length) { tbl.innerHTML = '<tr><td class="no-data">no repos found in watched_repos</td></tr>'; return; }
+  if (!rows.length) { tbl.innerHTML = '<tr><td class="no-data">No local repos found in config.json watched_repos. This does not mean GitHub watched repos.</td></tr>'; return; }
   const head = el('thead', {}, el('tr', {}, ...['repo', 'branch', 'state'].map(h => el('th', {}, h))));
   const body = el('tbody');
   rows.forEach(r => {
@@ -747,6 +786,16 @@ function renderOutdated(o) {
 function renderPackages(rows) {
   lastPackages = rows;
   const tbl = $('packages'); tbl.innerHTML = '';
+  const summary = $('package-summary');
+  const outdatedCount = rows.filter(p => p.status === 'outdated').length;
+  if (summary) {
+    const managers = [...new Set(rows.map(p => p.manager))].filter(Boolean).join(' / ') || 'packages';
+    summary.innerHTML = `
+      <div class="package-summary-item"><strong>${rows.length || 0}</strong><span>installed</span></div>
+      <div class="package-summary-item ${outdatedCount ? 'warn' : 'ok'}"><strong>${outdatedCount}</strong><span>updates</span></div>
+      <div class="package-summary-copy">${escapeHtml(managers)}</div>
+    `;
+  }
   if (!rows.length) { tbl.innerHTML = '<tr><td class="no-data">checking package inventory...</td></tr>'; return; }
   const q = packageFilters.search.toLowerCase();
   const filtered = rows.filter(p => {
@@ -948,26 +997,33 @@ function renderLogs(rows) {
 
 function renderBattery(bt) {
   const div = $('battery');
-  if (!bt || (!bt.battery && !bt.temperature_c)) { div.innerHTML = '<div class="no-data">no data</div>'; return; }
+  const top = $('header-battery');
+  if (!bt || (!bt.battery && !bt.temperature_c)) {
+    if (top) top.textContent = '🔋 --';
+    if (div) div.innerHTML = '<div class="no-data">no data</div>';
+    return;
+  }
   let html = '';
   if (bt.battery) {
     html += row('battery', `${bt.battery.pct}% ${bt.battery.plugged ? '⚡' : ''}`);
+    if (top) top.textContent = `🔋 ${bt.battery.pct}%${bt.battery.plugged ? ' ⚡' : ''}`;
   }
   if (bt.temperature_c) {
     html += row(bt.temperature_label || 'temp', `${bt.temperature_c}°C`);
   }
-  div.innerHTML = html;
+  if (div) div.innerHTML = html;
 }
 
 function renderCheats(rows) {
   lastCheats = rows;
   setupCommandBuilder(rows);
   const div = $('cheats');
-  div.innerHTML = '';
   const options = $('terminal-commands');
   if (options) {
     options.innerHTML = rows.map(c => `<option value="${escapeHtml(c.cmd)}">${escapeHtml(c.desc)}</option>`).join('');
   }
+  if (!div) return;
+  div.innerHTML = '';
   rows.forEach(c => {
     const row = el('div', { class: 'cheat-row', title: 'click to run in Terminal' });
     row.innerHTML = `<code>⚡ ${c.cmd}</code><span class="desc">${c.desc}</span>`;
@@ -1038,7 +1094,7 @@ function renderDataHogs(rows) {
   }
   const head = el('thead', {}, el('tr', {}, ...['file', 'folder', 'GB', ''].map(h => el('th', {}, h))));
   const body = el('tbody');
-  rows.forEach((r, idx) => {
+  rows.slice(0, 5).forEach((r, idx) => {
     const gb = Number(r.gb || 0);
     const klass = gb >= 5 ? 'bad' : gb >= 1 ? 'warn' : '';
     const tr = el('tr', {});

@@ -106,7 +106,7 @@ def disk_hogs() -> dict[str, Any]:
     return [{"label": k, "gb": v} for k, v in targets.items() if v is not None]
 
 
-def data_volume_hogs(limit: int = 10) -> list[dict[str, Any]]:
+def data_volume_hogs(limit: int = 5) -> list[dict[str, Any]]:
     """Top largest files on /System/Volumes/Data, best-effort with a hard timeout."""
     root = Path("/System/Volumes/Data")
     if not root.exists():
