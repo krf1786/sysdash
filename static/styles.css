@@ -2786,7 +2786,9 @@ main {
   display: none;
 }
 .card::after {
-  opacity: 0.18;
+  display: none;
+  background: none;
+  opacity: 0;
 }
 .card:hover {
   transform: none;
