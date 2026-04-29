@@ -20,18 +20,23 @@
     <div class="clock-details" id="clock-details">system details pending</div>
   </div>
   <div id="actions">
-    <div class="header-health">
-      <span id="top-health-dot"></span><span id="top-health-text">local system command center</span>
+    <div class="actions-row actions-primary">
+      <button class="diag" id="learning-mode" title="Show beginner-friendly explanations">🎓 learn</button>
+      <div class="theme-switch" aria-label="Theme">
+        <button class="theme-btn active" data-theme-choice="auto">🖥 Auto</button>
+        <button class="theme-btn" data-theme-choice="light">☀️ Light</button>
+        <button class="theme-btn" data-theme-choice="dark">🌙 Dark</button>
+      </div>
+      <button class="diag" id="open-settings" title="Open dashboard settings">⚙️ settings</button>
+      <button class="diag" id="run-diag" title="Run a one-shot diagnostic">🩺 help me</button>
     </div>
-    <div class="header-battery" id="header-battery">🔋 --</div>
-    <button class="diag" id="learning-mode" title="Show beginner-friendly explanations">🎓 learn</button>
-    <div class="theme-switch" aria-label="Theme">
-      <button class="theme-btn active" data-theme-choice="auto">🖥 Auto</button>
-      <button class="theme-btn" data-theme-choice="light">☀️ Light</button>
-      <button class="theme-btn" data-theme-choice="dark">🌙 Dark</button>
+    <div class="actions-row actions-status">
+      <div class="header-health">
+        <span id="top-health-dot"></span><span id="top-health-text">local system command center</span>
+      </div>
+      <div class="header-pill" id="header-battery">🔋 --</div>
+      <div class="header-pill" id="header-self">sysdash --</div>
     </div>
-    <button class="diag" id="open-settings" title="Open dashboard settings">⚙️ settings</button>
-    <button class="diag" id="run-diag" title="Run a one-shot diagnostic">🩺 help me</button>
   </div>
 </div>
 
@@ -83,13 +88,6 @@
     <div class="card diag-card">
       <h2>Diagnostic <span class="hint" data-tip="Plain-English summary of what's wrong right now. Refreshes with the dashboard.">?</span></h2>
       <div id="diagnostic"></div>
-    </div>
-
-    <div class="card sysdash-footprint-card">
-      <h2>Sysdash footprint
-        <span class="hint" data-tip="How much CPU and memory this dashboard process is using, including helper child processes.">?</span>
-      </h2>
-      <div id="sysdash-footprint"></div>
     </div>
 
     <div class="card">

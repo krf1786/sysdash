@@ -431,13 +431,23 @@ function formatUptime(sec) {
 
 function renderSysdashFootprint(s) {
   const div = $('sysdash-footprint');
-  if (!div) return;
-  if (!s) { div.innerHTML = '<div class="no-data">checking...</div>'; return; }
+  const top = $('header-self');
+  if (!s) {
+    if (top) top.textContent = 'sysdash --';
+    if (div) div.innerHTML = '<div class="no-data">checking...</div>';
+    return;
+  }
   const cpuClass = pctClass(Number(s.cpu_pct || 0), 8, 20);
   const memClass = Number(s.rss_mb || 0) > 900 ? 'bad' : Number(s.rss_mb || 0) > 500 ? 'warn' : '';
-  div.innerHTML =
-    row('cpu', `${Number(s.cpu_pct || 0).toFixed(1)}%`, cpuClass) +
-    row('memory', `${Number(s.rss_mb || 0).toFixed(1)} MB`, memClass);
+  if (top) {
+    top.className = `header-pill ${cpuClass || memClass}`.trim();
+    top.textContent = `sysdash ${Number(s.cpu_pct || 0).toFixed(1)}% · ${Number(s.rss_mb || 0).toFixed(0)} MB`;
+  }
+  if (div) {
+    div.innerHTML =
+      row('cpu', `${Number(s.cpu_pct || 0).toFixed(1)}%`, cpuClass) +
+      row('memory', `${Number(s.rss_mb || 0).toFixed(1)} MB`, memClass);
+  }
 }
 
 function renderPorts(ports, healths) {
@@ -679,16 +689,28 @@ function setupLlmChat() {
   const status = $('llm-chat-status');
   const serverSelect = $('llm-chat-server');
   const reset = $('llm-reset');
+  if (reset && !reset.dataset.ready) {
+    reset.dataset.ready = '1';
+    reset.addEventListener('click', async () => {
+      llmChatHistory = [];
+      renderLlmChatLog();
+      reset.disabled = true;
+      reset.textContent = 'resetting';
+      if (status) status.textContent = 'resetting local LLM state...';
+      try {
+        const r = await postAction('/api/llm/reset');
+        if (status) status.textContent = r.detail || 'local LLM state reset';
+      } catch (e) {
+        if (status) status.textContent = 'reset failed';
+      } finally {
+        reset.disabled = false;
+        reset.textContent = 'reset';
+      }
+    });
+  }
   if (!form || !input || form.dataset.ready) return;
   form.dataset.ready = '1';
   serverSelect?.addEventListener('change', refreshLlmChatModels);
-  reset?.addEventListener('click', async () => {
-    llmChatHistory = [];
-    renderLlmChatLog();
-    if (status) status.textContent = 'resetting local LLM state...';
-    const r = await postAction('/api/llm/reset');
-    if (status) status.textContent = r.detail || 'local LLM state reset';
-  });
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const message = input.value.trim();
