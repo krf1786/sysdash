@@ -249,16 +249,32 @@ LLM_SERVERS = [
     {"name": "text-generation-webui", "port": 5000, "models": "/v1/models", "kind": "openai"},
     {"name": "KoboldCPP", "port": 5001, "models": "/api/v1/model", "kind": "kobold"},
 ]
+LLM_PROCESS_NEEDLES = (
+    "ollama", "lm studio", "lmstudio", "llama", "kobold", "text-generation",
+    "oobabooga", "mlx", "vllm", "transformers", "llamafile"
+)
 
 _LLM_TPS_STATE: dict[int, tuple[float, float]] = {}
 _LLM_SAMPLE_STATE: dict[int, dict[str, Any]] = {}
+_LLM_RESET_TS = 0.0
 
 
 def reset_local_llm_state() -> dict[str, Any]:
     """Clear cached local LLM sampling state."""
+    global _LLM_RESET_TS
     _LLM_TPS_STATE.clear()
     _LLM_SAMPLE_STATE.clear()
-    return {"ok": True, "detail": "Local LLM token-rate caches reset."}
+    _LLM_RESET_TS = time.time()
+    return {"ok": True, "detail": "Local LLM activity counters reset."}
+
+
+def _llm_reset_recent(window: float = 90.0) -> bool:
+    return _LLM_RESET_TS > 0 and time.time() - _LLM_RESET_TS <= window
+
+
+def _looks_like_llm_process(text: str) -> bool:
+    haystack = text.lower()
+    return any(n in haystack for n in LLM_PROCESS_NEEDLES)
 
 
 def _http_json(url: str, timeout: float = 1.4) -> tuple[bool, Any]:
@@ -447,6 +463,7 @@ def local_llms() -> dict[str, Any]:
     """Known local LLM servers + matching processes."""
     listeners = {row["port"]: row for row in listening_ports()}
     servers = []
+    reset_recent = _llm_reset_recent()
     for spec in LLM_SERVERS:
         listener = listeners.get(spec["port"])
         url = f"http://127.0.0.1:{spec['port']}{spec['models']}"
@@ -455,26 +472,36 @@ def local_llms() -> dict[str, Any]:
         if spec["kind"] == "ollama" and not models:
             models = _ollama_loaded_models(spec["port"])
         tps = _llm_tokens_per_sec(spec["port"]) if ok or listener else {"value": None, "source": ""}
-        if tps["value"] is None and ok:
+        if reset_recent and ok:
+            tps = {"value": 0.0, "source": "reset", "samples": 0}
+        elif tps["value"] is None and ok:
             tps = _sample_llm_tokens_per_sec(spec, models)
+        listener_name = listener.get("process") if listener else ""
+        status = "api" if ok else "listening" if listener and _looks_like_llm_process(listener_name or "") else "offline"
+        tps_value = tps["value"]
+        activity = (
+            "generating" if status == "api" and (tps_value or 0) > 0.05
+            else "idle" if status == "api"
+            else "listener" if status == "listening"
+            else "offline"
+        )
         servers.append({
             "name": spec["name"],
             "port": spec["port"],
-            "status": "api" if ok else "listening" if listener else "offline",
+            "status": status,
+            "activity": activity,
+            "active": status != "offline",
+            "api_online": ok,
             "pid": listener.get("pid") if listener else None,
             "process": listener.get("process") if listener else "",
             "models": models[:6],
             "model_count": len(models),
             "url": url,
-            "tokens_per_sec": tps["value"],
+            "tokens_per_sec": tps_value,
             "tps_source": tps["source"],
             "tps_samples": tps.get("samples", 0),
         })
 
-    needles = (
-        "ollama", "lm studio", "lmstudio", "llama", "kobold", "text-generation",
-        "oobabooga", "mlx", "vllm", "transformers", "llamafile"
-    )
     processes = []
     try:
         proc_iter = psutil.process_iter(["pid", "name", "memory_info", "cpu_percent", "cmdline"])
@@ -482,7 +509,7 @@ def local_llms() -> dict[str, Any]:
             name = p.info.get("name") or ""
             cmd = " ".join(p.info.get("cmdline") or [])
             haystack = f"{name} {cmd}".lower()
-            if not any(n in haystack for n in needles):
+            if not _looks_like_llm_process(haystack):
                 continue
             rss = p.info["memory_info"].rss if p.info.get("memory_info") else 0
             processes.append({
@@ -496,14 +523,21 @@ def local_llms() -> dict[str, Any]:
         processes = []
 
     active = [s for s in servers if s["status"] != "offline"]
+    tps_values = [float(s["tokens_per_sec"] or 0) for s in active]
+    active_processes = sorted(processes, key=lambda x: -x["rss_mb"])[:5]
     return {
-        "servers": servers,
-        "processes": sorted(processes, key=lambda x: -x["rss_mb"])[:10],
+        "servers": active,
+        "processes": active_processes,
         "summary": {
             "active_servers": len(active),
-            "model_count": sum(s["model_count"] for s in servers),
+            "known_servers": len(servers),
+            "process_count": len(processes),
+            "model_count": sum(s["model_count"] for s in active),
             "ram_mb": round(sum(p["rss_mb"] for p in processes), 1),
-            "tokens_per_sec": round(sum(s["tokens_per_sec"] or 0 for s in servers), 2),
+            "cpu_pct": round(sum(p["cpu_pct"] for p in processes), 1),
+            "tokens_per_sec": 0.0 if reset_recent else round(sum(tps_values), 2),
+            "avg_tokens_per_sec": 0.0 if reset_recent or not tps_values else round(sum(tps_values) / len(tps_values), 2),
+            "reset_recent": reset_recent,
         },
     }
 

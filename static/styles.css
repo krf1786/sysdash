@@ -787,23 +787,25 @@ tr.needs-update td { background: rgba(241, 196, 15, 0.035); }
 
 .llm-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 8px;
 }
 .llm-summary > div {
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--violet) 18%, var(--border));
+  border-radius: 10px;
   background:
-    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--violet) 14%, transparent), transparent 8rem),
-    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--blue) 18%, transparent), transparent 5rem),
+    linear-gradient(145deg, rgba(255,255,255,0.075), rgba(124,92,255,0.035) 42%, rgba(0,0,0,0.12));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset;
 }
 .llm-summary strong {
   display: block;
   color: #fff;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--blue) 46%, transparent);
 }
 .llm-summary span {
   color: var(--text-dim);
@@ -821,42 +823,71 @@ tr.needs-update td { background: rgba(241, 196, 15, 0.035); }
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px;
   align-items: start;
-  padding: 6px 7px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: rgba(255,255,255,0.035);
+  padding: 7px;
+  border: 1px solid color-mix(in srgb, var(--violet) 22%, var(--border));
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--violet) 15%, transparent), transparent 8rem),
+    linear-gradient(155deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+  box-shadow: 0 12px 30px rgba(0,0,0,0.13), 0 1px 0 rgba(255,255,255,0.08) inset;
 }
-.llm-server.ok { border-color: color-mix(in srgb, var(--ok) 36%, var(--border)); }
+.llm-server.ok { border-color: color-mix(in srgb, var(--ok) 42%, var(--border)); }
+.llm-server.idle { border-color: color-mix(in srgb, var(--blue) 38%, var(--border)); }
 .llm-server.warn { border-color: color-mix(in srgb, var(--warn) 36%, var(--border)); }
+.llm-server-main {
+  min-width: 0;
+}
 .llm-server strong {
   display: flex;
   align-items: center;
+  gap: 4px;
   color: var(--text);
+  min-width: 0;
 }
 .llm-server span {
   color: var(--text-dim);
 }
 .llm-tps {
-  min-width: 76px;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
+  min-width: 86px;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--blue) 22%, var(--border));
   border-radius: 10px;
   text-align: right;
-  background: rgba(0,0,0,0.16);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(99, 179, 237, 0.16), transparent 4rem),
+    rgba(0,0,0,0.18);
 }
 .llm-tps b {
   display: block;
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.1;
 }
 .llm-tps.ok b { color: var(--accent); }
+.llm-tps.idle b { color: var(--blue); }
 .llm-tps.dim b { color: var(--text-dim); }
 .llm-tps span {
   display: block;
   font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+.llm-stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 5px;
+}
+.llm-stat-strip span {
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--blue) 18%, var(--border));
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .llm-models {
   display: flex;
@@ -874,6 +905,28 @@ tr.needs-update td { background: rgba(241, 196, 15, 0.035); }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.llm-empty-state {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px dashed color-mix(in srgb, var(--blue) 24%, var(--border));
+  border-radius: 12px;
+  background: rgba(255,255,255,0.035);
+}
+.llm-empty-state strong {
+  color: var(--text);
+}
+.llm-empty-state span {
+  color: var(--text-dim);
+  line-height: 1.35;
+}
+.llm-section-title {
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 2px 0 4px;
 }
 .llm-card .card-mini-toolbar {
   margin-bottom: 6px;

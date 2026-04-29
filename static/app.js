@@ -31,6 +31,8 @@ let activeConfig = null;
 let lastCheats = [];
 let llmChatServers = [];
 let llmChatHistory = [];
+let lastLlms = null;
+let llmStatsResetUntil = 0;
 
 // Ask for notification permission once.
 if ('Notification' in window && Notification.permission === 'default') {
@@ -588,28 +590,40 @@ function renderRuntimes(rows) {
 function renderLlms(data) {
   const div = $('llms');
   if (!div) return;
-  const servers = data.servers || [];
+  lastLlms = data;
+  const resetZero = Date.now() < llmStatsResetUntil || Boolean(data.summary?.reset_recent);
+  const servers = (data.servers || []).filter(s => s.status !== 'offline');
   const processes = data.processes || [];
   const summary = data.summary || {};
   updateLlmChatOptions(servers);
-  const serverHtml = servers.map(s => {
-    const cls = s.status === 'api' ? 'ok' : s.status === 'listening' ? 'warn' : 'dim';
-    const modelText = s.model_count ? `${s.model_count} model${s.model_count === 1 ? '' : 's'}` : s.status === 'offline' ? 'offline' : 'no model list';
-    const tps = s.tokens_per_sec == null ? 'n/a' : `${Number(s.tokens_per_sec).toFixed(1)} tok/s`;
-    const tpsLabel = s.tokens_per_sec == null ? (s.tps_source || 'unavailable') : s.tps_source === 'avg sample' ? `avg${s.tps_samples ? ` · ${s.tps_samples}` : ''}` : 'live';
+  const visibleTps = resetZero ? 0 : Number(summary.avg_tokens_per_sec || 0);
+  const totalTps = resetZero ? 0 : Number(summary.tokens_per_sec || 0);
+  const serverHtml = servers.length ? servers.map(s => {
+    const activity = resetZero && s.status === 'api' ? 'idle' : (s.activity || (s.status === 'api' ? 'idle' : 'listener'));
+    const cls = activity === 'generating' ? 'ok' : s.status === 'api' ? 'idle' : 'warn';
+    const modelText = s.model_count ? `${s.model_count} model${s.model_count === 1 ? '' : 's'}` : 'no model list';
+    const tpsValue = resetZero ? 0 : s.tokens_per_sec;
+    const tps = tpsValue == null ? 'n/a' : `${Number(tpsValue).toFixed(1)}`;
+    const tpsLabel = resetZero ? 'reset' : tpsValue == null ? (s.tps_source || 'unavailable') : s.tps_source === 'avg sample' ? `avg${s.tps_samples ? ` · ${s.tps_samples}` : ''}` : (s.tps_source || 'live');
     const names = (s.models || []).length ? `<div class="llm-models">${s.models.map(x => `<span>${escapeHtml(x)}</span>`).join('')}</div>` : '';
     return `
       <div class="llm-server ${cls}">
-        <div>
-          <strong><span class="dot ${cls}"></span>${escapeHtml(s.name)}</strong>
-          <span>${escapeHtml(modelText)} · :${s.port}${s.pid ? ` · PID ${s.pid}` : ''}</span>
+        <div class="llm-server-main">
+          <strong><span class="dot ${cls === 'idle' ? 'ok' : cls}"></span>${escapeHtml(s.name)}</strong>
+          <span>${escapeHtml(activity)} · ${escapeHtml(modelText)} · :${s.port}${s.pid ? ` · PID ${s.pid}` : ''}</span>
         </div>
-        <div class="llm-tps ${s.tokens_per_sec == null ? 'dim' : 'ok'}"><b>${escapeHtml(tps)}</b><span>${escapeHtml(tpsLabel)}</span></div>
+        <div class="llm-tps ${tpsValue == null ? 'dim' : activity === 'generating' ? 'ok' : 'idle'}"><b>${escapeHtml(tps)}</b><span>tok/s · ${escapeHtml(tpsLabel)}</span></div>
+        <div class="llm-stat-strip">
+          <span>API ${s.api_online ? 'online' : 'not reachable'}</span>
+          <span>${escapeHtml(s.process || 'process unknown')}</span>
+          <span>${s.pid ? `PID ${s.pid}` : 'no PID'}</span>
+        </div>
         ${names}
       </div>
     `;
-  }).join('');
+  }).join('') : '<div class="llm-empty-state"><strong>No active local LLMs</strong><span>Start Ollama, LM Studio, llama.cpp, or KoboldCPP and sysdash will pick it up automatically.</span></div>';
   const procHtml = processes.length ? `
+    <div class="llm-section-title">LLM process load</div>
     <table class="llm-processes">
       <thead><tr><th>pid</th><th>process</th><th>ram</th><th>cpu</th></tr></thead>
       <tbody>${processes.map(p => `<tr><td>${p.pid}</td><td class="mono-clip" title="${escapeHtml(p.cmd || p.name)}">${escapeHtml(p.name)}</td><td>${p.rss_mb}</td><td>${p.cpu_pct}%</td></tr>`).join('')}</tbody>
@@ -617,10 +631,12 @@ function renderLlms(data) {
   ` : '<div class="no-data">No local LLM processes detected.</div>';
   div.innerHTML = `
     <div class="llm-summary">
-      <div><strong>${summary.active_servers || 0}</strong><span>servers</span></div>
+      <div><strong>${summary.active_servers || 0}</strong><span>active</span></div>
       <div><strong>${summary.model_count || 0}</strong><span>models</span></div>
-      <div><strong>${Number(summary.tokens_per_sec || 0).toFixed(1)}</strong><span>avg tok/sec</span></div>
+      <div><strong>${visibleTps.toFixed(1)}</strong><span>avg tok/s</span></div>
+      <div><strong>${totalTps.toFixed(1)}</strong><span>total tok/s</span></div>
       <div><strong>${Number(summary.ram_mb || 0).toFixed(0)}</strong><span>MB RAM</span></div>
+      <div><strong>${Number(summary.cpu_pct || 0).toFixed(1)}%</strong><span>CPU</span></div>
     </div>
     <div class="llm-server-list">${serverHtml}</div>
     ${procHtml}
@@ -694,17 +710,20 @@ function setupLlmChat() {
     reset.addEventListener('click', async () => {
       llmChatHistory = [];
       renderLlmChatLog();
+      llmStatsResetUntil = Date.now() + 90000;
+      if (lastLlms) renderLlms(lastLlms);
       reset.disabled = true;
       reset.textContent = 'resetting';
       if (status) status.textContent = 'resetting local LLM state...';
       try {
         const r = await postAction('/api/llm/reset');
+        if (lastLlms) renderLlms(lastLlms);
         if (status) status.textContent = r.detail || 'local LLM state reset';
       } catch (e) {
         if (status) status.textContent = 'reset failed';
       } finally {
         reset.disabled = false;
-        reset.textContent = 'reset';
+        reset.textContent = 'reset stats';
       }
     });
   }

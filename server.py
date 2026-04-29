@@ -592,7 +592,13 @@ async def llm_chat(payload: dict[str, Any]) -> dict[str, Any]:
 
 @app.post("/api/llm/reset")
 async def llm_reset() -> dict[str, Any]:
-    return cdev.reset_local_llm_state()
+    result = cdev.reset_local_llm_state()
+    llms = await asyncio.to_thread(cdev.local_llms)
+    if STATE.last_metrics:
+        STATE.last_metrics["llms"] = llms
+        STATE.last_metrics["ts"] = time.time()
+    result["llms"] = llms
+    return result
 
 
 @app.websocket("/ws")
